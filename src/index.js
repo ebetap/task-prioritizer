@@ -3,7 +3,7 @@ class TaskPrioritizer {
         this.tasks = [];
     }
 
-    validateTaskProperties({ name, importance, urgency, dueDate }) {
+    validateTaskProperties({ name, importance, urgency, dueDate, category }) {
         if (typeof name !== 'string' || name.trim() === '') {
             throw new Error('Task name must be a non-empty string.');
         }
@@ -16,14 +16,27 @@ class TaskPrioritizer {
         if (dueDate && isNaN(new Date(dueDate).getTime())) {
             throw new Error('Due date must be a valid date.');
         }
+        if (category && (typeof category !== 'string' || category.trim() === '')) {
+            throw new Error('Category must be a non-empty string.');
+        }
     }
 
     addTask(name, importance, urgency, dueDate = null, description = '', category = null) {
-        this.validateTaskProperties({ name, importance, urgency, dueDate });
+        this.validateTaskProperties({ name, importance, urgency, dueDate, category });
         if (this.tasks.some(task => task.name === name)) {
             throw new Error(`Task with the name "${name}" already exists.`);
         }
-        const task = { name, importance, urgency, dueDate, description, category, score: importance + urgency, completed: false };
+        const task = { 
+            name, 
+            importance, 
+            urgency, 
+            dueDate, 
+            description, 
+            category, 
+            score: importance + urgency, 
+            completed: false,
+            completedAt: null 
+        };
         this.tasks.push(task);
         this.prioritizeTasks();
     }
@@ -50,7 +63,10 @@ class TaskPrioritizer {
 
     completeTask(name) {
         const task = this.tasks.find(task => task.name === name);
-        if (task) task.completed = true;
+        if (task) {
+            task.completed = true;
+            task.completedAt = new Date();
+        }
     }
 
     deleteTask(name) {
@@ -60,9 +76,7 @@ class TaskPrioritizer {
     editTask(name, updates) {
         const task = this.tasks.find(task => task.name === name);
         if (task) {
-            if (updates.dueDate && isNaN(new Date(updates.dueDate).getTime())) {
-                throw new Error('Due date must be a valid date.');
-            }
+            this.validateTaskProperties({ ...task, ...updates });
             Object.assign(task, updates);
             this.prioritizeTasks();
         }
@@ -80,15 +94,22 @@ class TaskPrioritizer {
     }
 
     loadTasks() {
-        const tasks = JSON.parse(localStorage.getItem('tasks'));
-        if (tasks) {
-            this.tasks = tasks.map(task => {
-                if (task.dueDate) {
-                    task.dueDate = new Date(task.dueDate);
-                }
-                return task;
-            });
-            this.prioritizeTasks();
+        try {
+            const tasks = JSON.parse(localStorage.getItem('tasks'));
+            if (tasks) {
+                this.tasks = tasks.map(task => {
+                    if (task.dueDate) {
+                        task.dueDate = new Date(task.dueDate);
+                    }
+                    if (task.completedAt) {
+                        task.completedAt = new Date(task.completedAt);
+                    }
+                    return task;
+                });
+                this.prioritizeTasks();
+            }
+        } catch (error) {
+            console.error('Failed to load tasks:', error);
         }
     }
 }
